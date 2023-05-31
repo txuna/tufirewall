@@ -1,0 +1,11 @@
+*.ko
+*.o
+*.cmd
+*.json
+*.vscode
+./vscode
+*.mod 
+*.order	
+*.symvers
+*.d
+*.conf
