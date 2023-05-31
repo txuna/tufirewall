@@ -21,18 +21,21 @@ static int packet_in_zone_handler(void *priv, struct sk_buff *skb, const struct 
 {
 	struct list_head *pos = NULL; 
 	struct rule_list *cur_rule = NULL;
+	struct sk_buff *sb = NULL;
 
 	if(!skb)
 	{
 		return NF_ACCEPT;
 	}
 
+	sb = skb;
+
 	list_for_each(pos, &tu_rules.list)
 	{
 		cur_rule = list_entry(pos, struct rule_list, list); 
 		if(cur_rule->data->when == WHEN_IN_ZONE)
 		{
-			if(rule_match(WHEN_IN_ZONE, skb, cur_rule->data) == TU_RULE_MATCH)
+			if(rule_match(WHEN_IN_ZONE, sb, cur_rule->data) == TU_RULE_MATCH)
 			{
 				if(cur_rule->data->action == NF_ACCEPT)
 				{
@@ -57,20 +60,21 @@ static int packet_out_zone_handler(void *priv, struct sk_buff *skb, const struct
 {
 	struct list_head *pos = NULL; 
 	struct rule_list *cur_rule = NULL;
-	//char sip_str[17] = {0, }; 
-	//char dip_str[17] = {0, };
-	
+	struct sk_buff *sb = NULL;
+
 	if(!skb)
 	{
 		return NF_ACCEPT;
 	}
+
+	sb = skb;
 
 	list_for_each(pos, &tu_rules.list)
 	{
 		cur_rule = list_entry(pos, struct rule_list, list);
 		if(cur_rule->data->when == WHEN_OUT_ZONE)
 		{
-			if(rule_match(WHEN_OUT_ZONE, skb, cur_rule->data) == TU_RULE_MATCH)
+			if(rule_match(WHEN_OUT_ZONE, sb, cur_rule->data) == TU_RULE_MATCH)
 			{
 				if(cur_rule->data->action == NF_ACCEPT)
 				{
@@ -94,6 +98,12 @@ static int rule_match(int zone, struct sk_buff *skb, struct rule_data *rule)
 {
 	struct iphdr *iph = NULL;
 	iph = ip_hdr(skb);
+
+	if(iph == NULL)
+	{
+		printk(KERN_INFO "IP Header has NULL in rule_match()\n");
+		return TU_RULE_NONE_MATCH;
+	}
 
 	if(iph->protocol != rule->protocol)
 	{
@@ -121,14 +131,14 @@ static int rule_match(int zone, struct sk_buff *skb, struct rule_data *rule)
 static int rule_match_icmp(int zone, struct sk_buff *skb, struct rule_data *rule)
 {
 	struct iphdr *iph = NULL;
-	__u32 sip = ntohl(iph->saddr); 
-	__u32 dip = ntohl(iph->daddr);
-
-	iph = ip_hdr(skb);
+	__u32 sip, dip = 0; 
+	iph = ip_hdr(skb); 
+	sip = ntohl(iph->saddr); 
+	dip = ntohl(iph->daddr);
 
 	if(zone == WHEN_IN_ZONE)
 	{
-		if(sip == rule->ip_value.sip)
+		if(sip == rule->ip)
 		{
 			return TU_RULE_MATCH;
 		}
@@ -136,7 +146,7 @@ static int rule_match_icmp(int zone, struct sk_buff *skb, struct rule_data *rule
 
 	else if(zone == WHEN_OUT_ZONE)
 	{
-		if(dip == rule->ip_value.dip)
+		if(dip == rule->ip)
 		{
 			return TU_RULE_MATCH;
 		}
@@ -155,15 +165,16 @@ static int rule_match_tcp(int zone, struct sk_buff *skb, struct rule_data *rule)
 
 	if(zone == WHEN_IN_ZONE)
 	{
-		if(sip == rule->ip_value.sip && dport == rule->dport)
+		if(sip == rule->ip && dport == rule->port)
 		{
+			printk(KERN_INFO "in zone in tcp match\n");
 			return TU_RULE_MATCH;
 		}
 	}
 
 	else if(zone == WHEN_OUT_ZONE)
 	{		
-		if(dip == rule->ip_value.dip && dport == rule->dport)
+		if(dip == rule->ip && dport == rule->port)
 		{
 			return TU_RULE_MATCH;
 		}
@@ -182,7 +193,7 @@ static int rule_match_udp(int zone, struct sk_buff *skb, struct rule_data *rule)
 
 	if(zone == WHEN_IN_ZONE)
 	{
-		if(sip == rule->ip_value.sip && dport == rule->dport)
+		if(sip == rule->ip && dport == rule->port)
 		{
 			return TU_RULE_MATCH;
 		}
@@ -190,7 +201,7 @@ static int rule_match_udp(int zone, struct sk_buff *skb, struct rule_data *rule)
 
 	else if(zone == WHEN_OUT_ZONE)
 	{		
-		if(dip == rule->ip_value.dip && dport == rule->dport)
+		if(dip == rule->ip && dport == rule->port)
 		{
 			return TU_RULE_MATCH;
 		}
@@ -221,7 +232,7 @@ static int processing_hook(void)
 	tu_nf_local_out_ops = (struct nf_hook_ops *)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
 	if(tu_nf_local_out_ops == NULL)
 	{
-		printk(KERN_INFO "kcalloc(): Failed Allocate nf_local_in_ops in kernelspace\n");	
+		printk(KERN_INFO "kcalloc(): Failed Allocate nf_local_out_ops in kernelspace\n");	
 		kfree(tu_nf_local_in_ops);
 		return -1;
 	}
@@ -252,7 +263,7 @@ static void setup_testrule(void)
 		rule->action = NF_ACCEPT; 
 		rule->protocol = IPPROTO_ICMP; 
 		rule->when = WHEN_OUT_ZONE;
-		rule->ip_value.dip = ip_value;
+		rule->ip = ip_value;
 		push_rule(&tu_rules.list, rule);
 	}
 
@@ -269,25 +280,25 @@ static void setup_testrule(void)
 		rule->action = NF_DROP; 
 		rule->protocol = IPPROTO_ICMP; 
 		rule->when = WHEN_OUT_ZONE;
-		rule->ip_value.dip = ip_value;
+		rule->ip = ip_value;
 		push_rule(&tu_rules.list, rule);
 	}
-
+	
 	rule = (struct rule_data *)kcalloc(1, sizeof(struct rule_data), GFP_KERNEL); 
 
 	if(rule != NULL)
 	{
-		if(tu_inet_pton_ipv4("1.1.1.1", &ip_value) == 0)
+		if(tu_inet_pton_ipv4("200.200.200.200", &ip_value) == 0)
 		{
 			kfree(rule);
 			return;
 		}
-		strncpy(rule->name, "[test rule]", strlen("[test rule]"));
+		strncpy(rule->name, "[home rule]", strlen("[home rule]"));
 		rule->action = NF_DROP; 
 		rule->protocol = IPPROTO_TCP; 
 		rule->when = WHEN_IN_ZONE;
-		rule->ip_value.sip = ip_value;
-		rule->dport = 50000;
+		rule->ip = ip_value;
+		rule->port = 50000;
 		push_rule(&tu_rules.list, rule);
 	}
 }

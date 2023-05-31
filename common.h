@@ -32,14 +32,9 @@ struct rule_data
 	__u8 action; //NF_ACCEPT, NF_DROP
 	__u8 protocol; 
 	__u8 when;   //determin NF_INET_LOCAL_IN, NF_INET_LOCAL_OUT
-	
-	union _ip_value
-	{
-		__u32 sip;   
-		__u32 dip;
-	}ip_value; 
 
-	__u16 dport;
+	__u32 ip;
+	__u16 port;
 };
 
 struct rule_list

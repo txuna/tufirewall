@@ -38,7 +38,7 @@ void del_all_rules(struct list_head *head)
 	list_for_each_safe(pos, next, head)
 	{
 		temp = list_entry(pos, struct rule_list, list); 
-		printk(KERN_INFO "DELETE RULE : %s", temp->data->name);
+		printk(KERN_INFO "DELETE RULE : %s\n", temp->data->name);
 		list_del(pos);
 		kfree(temp->data);
 		kfree(temp);
