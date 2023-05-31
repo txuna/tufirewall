@@ -9,3 +9,4 @@
 *.symvers
 *.d
 *.conf
+*.out
