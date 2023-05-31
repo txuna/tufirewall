@@ -167,7 +167,6 @@ static int rule_match_tcp(int zone, struct sk_buff *skb, struct rule_data *rule)
 	{
 		if(sip == rule->ip && dport == rule->port)
 		{
-			printk(KERN_INFO "in zone in tcp match\n");
 			return TU_RULE_MATCH;
 		}
 	}
