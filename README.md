@@ -59,4 +59,24 @@ sudo lsmod | grep firewall
 sudo rmmod firewall
 ```
 
-# Image 
+# Images
+### RUN firewall module 
+![run](./images/firewall_start.png)
+
+### DROP ICMP 
+![block_icmp](./images/firewall_block_icmp.png)
+
+### DROP ICMP REASON
+![block_icmp_content](./images/firewall_drop_icmp_content.png)
+
+### ACCEPT ICMP
+![allow_icmp](./images/firewall_allow_icmp.png)
+
+### ACCEPT ICMP REASON 
+![allow_icmp_content](./images/firewall_allow_icmp_content.png)
+
+### DROP TCP 
+![block_tcp](./images/firewalL_run_tcp.png)
+
+### DROP TCP REASON
+![block_tcp_content](./images/firewall_drop_tcp_content.png)
