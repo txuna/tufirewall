@@ -1,10 +1,20 @@
 #include "common.h"
 #include "rule_list.h"
 
+// add rule 
+#define ADD_RULE _IOW('a','a',struct rule_data*)
+
+// remove rule
+#define DELETE_RULE _IOW('b','b', __u32*)
+
 struct rule_list tu_rules;
 
 struct nf_hook_ops *tu_nf_local_in_ops = NULL;
 struct nf_hook_ops *tu_nf_local_out_ops = NULL;
+
+dev_t dev = 0;
+static struct class *dev_class;
+static struct cdev etx_cdev;
 
 static int tu_inet_pton_ipv4(const char* ip_str, __u32* ip_addr);
 static int packet_in_zone_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
@@ -15,6 +25,82 @@ static int rule_match_icmp(int zone, struct sk_buff *skb, struct rule_data *rule
 static int rule_match(int zone, struct sk_buff *skb, struct rule_data *rule);
 static int rule_match_tcp(int zone, struct sk_buff *skb, struct rule_data *rule);
 static int rule_match_udp(int zone, struct sk_buff *skb, struct rule_data *rule);
+
+static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off);
+static ssize_t etx_read(struct file *filp, char __user *buf, size_t len, loff_t *off);
+static int etx_release(struct inode *inode, struct file *file);
+static int etx_open(struct inode *inode, struct file *file);
+static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+
+/*
+* File operation sturcture
+*/
+static struct file_operations fops =
+{
+        .owner          = THIS_MODULE,
+        .read           = etx_read,
+        .write          = etx_write,
+        .open           = etx_open,
+        .unlocked_ioctl = etx_ioctl,
+        .release        = etx_release,
+};
+
+static int etx_open(struct inode *inode, struct file *file)
+{
+	printk(KERN_INFO "Device File Opened\n");
+	return 0;
+}
+
+static int etx_release(struct inode *inode, struct file *file)
+{
+	printk(KERN_INFO "Device File Closed\n");
+	return 0;
+}
+
+static ssize_t etx_read(struct file *filp, char __user *buf, size_t len, loff_t *off)
+{
+	printk(KERN_INFO "Read Function\n");
+	return 0;
+}
+
+static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, loff_t *off)
+{
+	printk(KERN_INFO "Write Function\n");
+	return 0;
+}
+
+static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	__u32 value;
+	struct rule_data rule_arg;  
+	switch(cmd)
+	{
+		case ADD_RULE:
+			if(copy_from_user(&rule_arg, (struct rule_data *)arg, sizeof(struct rule_data)))
+			{
+				printk(KERN_INFO "No Rule Data From Userspace\n");
+				break;
+			}
+
+			printk(KERN_INFO "Received value from user space\n");
+			printk(KERN_INFO "RULE NAME : %s\n", rule_arg.name);
+			break; 
+
+		case DELETE_RULE:
+			if(copy_from_user(&value, (__u32*)arg, sizeof(value)))
+			{
+				printk(KERN_INFO "Error Delete Command\n");
+				break;
+			}
+			printk(KERN_INFO "Delete All Rules\n");
+			break;
+
+		default:
+			break;
+	}
+
+	return 0;
+}
 
 
 static int packet_in_zone_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
@@ -336,15 +422,46 @@ static int tu_inet_pton_ipv4(const char* ip_str, __u32* ip_addr) {
 static int __init tu_firewall_init(void)
 {
 	int ret = 0;
-
 	printk(KERN_INFO "load module : tu firewall"); 
+
+	if((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) < 0)
+	{
+		printk(KERN_INFO "Cannot allocate major number\n");
+		return -1;
+	}
+
+	printk(KERN_INFO "Major = %d Minor = %d\n", MAJOR(dev), MINOR(dev));
+
+	// Creating cdev structure 
+	cdev_init(&etx_cdev, &fops);
+
+	// Adding character device to the system 
+	if((cdev_add(&etx_cdev, dev, 1)) < 0)
+	{
+		printk(KERN_INFO "Cannot add the device to the system\n");
+		goto r_class; 
+	}
+
+	// Creating struct class 
+	if(IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class")))
+	{
+		printk(KERN_INFO "Cannot create the struct class\n");
+		goto r_class; 
+	}
+
+	// Creating Device 
+	if(IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device")))
+	{
+		printk(KERN_INFO "Cannot create the Device\n");
+		goto r_device; 
+	}
+
+	printk(KERN_INFO "Successfully Device Driver Insert\n");
 
 	INIT_LIST_HEAD(&tu_rules.list);
 	
 	// rule processing 
-	setup_testrule();
-
-	printk(KERN_INFO "Fin parse rule\n");
+	//setup_testrule();
 
 	ret = processing_hook();
 	if(ret != -1)
@@ -354,12 +471,23 @@ static int __init tu_firewall_init(void)
 	}
 
 	return 0;
+
+r_device:
+	class_destroy(dev_class); 
+
+r_class:
+	unregister_chrdev_region(dev, 1);
+	return -1;
 }
 
 static void __exit tu_firewall_exit(void)
 {
 	printk(KERN_INFO "unload module : tu firewall");
 
+	device_destroy(dev_class, dev);
+	class_destroy(dev_class); 
+	cdev_del(&etx_cdev); 
+	unregister_chrdev_region(dev, 1); 
 	//delete and free rules and unregister hook
 	del_all_rules(&tu_rules.list);
 
@@ -375,3 +503,5 @@ module_exit(tu_firewall_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("tuuna");
+MODULE_DESCRIPTION("Firewall"); 
+MODULE_VERSION("1.0.0");

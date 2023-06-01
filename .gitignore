@@ -10,3 +10,5 @@
 *.d
 *.conf
 *.out
+a.out 
+test.c 

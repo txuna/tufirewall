@@ -10,6 +10,14 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/string.h>
+
+#include <linux/fs.h>
+#include <linux/cdev.h>
+#include <linux/device.h>
+#include <linux/uaccess.h>
+
+#include <linux/ioctl.h>
+
 #include <linux/list.h>
 
 #define MAXINUM_RULE_NAME 45

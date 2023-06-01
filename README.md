@@ -5,7 +5,7 @@ kernel 5.15 version tu firewall using netfilter hook
 linux에서 사용되는 방화벽 iptables는 netfilter hook의 알람을 받아 패킷의 처리를 진행한다.  
 이처럼 tufirewall 또한 kernel module로서 동작하며 netfilter hook(NF_INET_LOCAL_IN, NF_INET_LOCAL_OUT)의 알람을 받아 패킷의 처리를 진행한다.
 
-NF_INET_LOCAL_IN : 패킷이 호스트내부로 전송 
+NF_INET_LOCAL_IN : 패킷이 호스트내부로 전송   
 NF_INET_LOCAL_OUT : 호스트에서 외부로 패킷이 전송 
 
 패킷의 기본적인 필터는 아래의 구조체를 기반으로 진행한다. 
