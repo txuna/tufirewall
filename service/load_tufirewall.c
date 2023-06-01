@@ -229,11 +229,11 @@ int create_rule(char *key, char *value, struct Rule *rule)
     {
         if(strncmp(value, "INPUT", strlen("INPUT")) == 0)
         {
-            rule->action = WHEN_IN_ZONE; 
+            rule->when = WHEN_IN_ZONE; 
         }
         else if(strncmp(value, "OUTPUT", strlen("OUTPUT")) == 0)
         {
-            rule->action = WHEN_OUT_ZONE;
+            rule->when = WHEN_OUT_ZONE;
         }
         else
         {

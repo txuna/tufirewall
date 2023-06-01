@@ -31,6 +31,7 @@ static ssize_t etx_read(struct file *filp, char __user *buf, size_t len, loff_t 
 static int etx_release(struct inode *inode, struct file *file);
 static int etx_open(struct inode *inode, struct file *file);
 static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+static struct rule_data *create_rule(struct rule_data arg);
 
 /*
 * File operation sturcture
@@ -69,10 +70,65 @@ static ssize_t etx_write(struct file *filp, const char __user *buf, size_t len, 
 	return 0;
 }
 
+static struct rule_data *create_rule(struct rule_data arg)
+{
+	struct rule_data *data = (struct rule_data*)kcalloc(1, sizeof(struct rule_data), GFP_KERNEL);
+	if(data == NULL)
+	{
+		return NULL;
+	}
+
+	strncpy(data->name, arg.name, strlen(arg.name));
+	data->action = arg.action; 
+	data->ip = arg.ip; 
+	data->port = arg.port; 
+	data->protocol = arg.protocol; 
+	data->when = arg.when;
+
+	// rule 검증 
+	data->name[MAXINUM_RULE_NAME-1] = '\0';
+
+	if(data->protocol != IPPROTO_TCP && data->protocol != IPPROTO_UDP && data->protocol != IPPROTO_ICMP)
+	{
+		printk(KERN_INFO "f\n");
+		return NULL;
+	}
+
+	if(data->protocol == IPPROTO_TCP || data->protocol == IPPROTO_UDP)
+	{
+		if(data->port < 0 || data->port > 65536)
+		{
+			printk(KERN_INFO "a\n");
+			return NULL;
+		}
+	}
+
+	if(data->ip < 0 || data->ip > 4294967295)
+	{
+		printk(KERN_INFO "b\n");
+		return NULL;
+	}
+
+	if(data->when != WHEN_IN_ZONE && data->when != WHEN_OUT_ZONE)
+	{
+		printk(KERN_INFO "c\n");
+		return NULL;
+	}
+
+	if(data->action != NF_DROP && data->action != NF_ACCEPT)
+	{
+		printk(KERN_INFO "d\n");
+		return NULL;
+	}
+
+	return data;
+}
+
 static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	__u32 value;
 	struct rule_data rule_arg;  
+	struct rule_data *data = NULL;
 	switch(cmd)
 	{
 		case ADD_RULE:
@@ -80,9 +136,17 @@ static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			{
 				printk(KERN_INFO "No Rule Data From Userspace\n");
 				break;
+			} 
+			
+			data = create_rule(rule_arg); 
+			if(data == NULL)
+			{
+				printk(KERN_INFO "Invalid Received Rule From user space\n");
+				break; 
 			}
 
-			printk(KERN_INFO "Received value from user space\n");
+			push_rule(&tu_rules.list, data);
+			printk(KERN_INFO "Received Rule from user space\n");
 			printk(KERN_INFO "RULE NAME : %s\n", rule_arg.name);
 			break; 
 
@@ -92,6 +156,9 @@ static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				printk(KERN_INFO "Error Delete Command\n");
 				break;
 			}
+			// delete all rules
+			del_all_rules(&tu_rules.list);
+
 			printk(KERN_INFO "Delete All Rules\n");
 			break;
 
