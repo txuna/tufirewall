@@ -106,6 +106,103 @@ sudo lsmod | grep firewall
 sudo rmmod firewall
 ```
 
+# Code
+Rule Match - IN ZONE 
+```C
+static int packet_in_zone_handler(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
+{
+	struct list_head *pos = NULL; 
+	struct rule_list *cur_rule = NULL;
+	struct sk_buff *sb = NULL;
+
+	if(!skb)
+	{
+		return NF_ACCEPT;
+	}
+
+	sb = skb;
+
+	list_for_each(pos, &tu_rules.list)
+	{
+		cur_rule = list_entry(pos, struct rule_list, list); 
+		if(cur_rule->data->when == WHEN_IN_ZONE)
+		{
+			if(rule_match(WHEN_IN_ZONE, sb, cur_rule->data) == TU_RULE_MATCH)
+			{
+				if(cur_rule->data->action == NF_ACCEPT)
+				{
+					printk(KERN_INFO "[TU FIREWALL] [IN ZONE] ACCEPT RULE : %s\n", cur_rule->data->name);
+				}
+
+				else if(cur_rule->data->action == NF_DROP)
+				{
+					printk(KERN_INFO "[TU FIREWALL] [IN ZONE] DROP RULE : %s\n", cur_rule->data->name);
+				}
+
+				return cur_rule->data->action;
+			}
+		}
+	}
+    
+	return NF_ACCEPT;
+}
+```
+
+IOCTL - get rules from userspace
+```
+	switch(cmd)
+	{
+		case ADD_RULE:
+			if(copy_from_user(&rule_arg, (struct rule_data *)arg, sizeof(struct rule_data)))
+			{
+				printk(KERN_INFO "No Rule Data From Userspace\n");
+				break;
+			} 
+			
+			data = create_rule(rule_arg); 
+			if(data == NULL)
+			{
+				printk(KERN_INFO "Invalid Received Rule From user space\n");
+				break; 
+			}
+
+			push_rule(&tu_rules.list, data);
+			printk(KERN_INFO "Received Rule from user space\n");
+			printk(KERN_INFO "RULE NAME : %s\n", rule_arg.name);
+			break; 
+
+		case DELETE_RULE:
+			if(copy_from_user(&value, (__u32*)arg, sizeof(value)))
+			{
+				printk(KERN_INFO "Error Delete Command\n");
+				break;
+			}
+			// delete all rules
+			del_all_rules(&tu_rules.list);
+
+			printk(KERN_INFO "Delete All Rules\n");
+			break;
+
+		default:
+			break;
+	}
+```
+
+Register Nerfilter Hook
+```C
+	tu_nf_local_in_ops = (struct nf_hook_ops *)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
+	if(tu_nf_local_in_ops == NULL)
+	{
+		printk(KERN_INFO "kcalloc(): Failed Allocate nf_local_in_ops in kernelspace\n");	
+		return -1;
+	}
+
+	tu_nf_local_in_ops->hook = (nf_hookfn*)packet_in_zone_handler; 
+	tu_nf_local_in_ops->hooknum = NF_INET_LOCAL_IN; 
+	tu_nf_local_in_ops->pf = NFPROTO_IPV4; 
+	tu_nf_local_in_ops->priority = in_priority;
+```
+
 # Images
 ### RUN firewall module 
 ![run](./images/firewall_start.png)
