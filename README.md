@@ -59,8 +59,9 @@ sudo insmod firewall.ko
 # Update Rule
 IOCTL을 사용하여 현재 커널 모듈에 등록된 룰을 지우고 새로운 룰을 등록합니다. 
 ```Shell
-cd ./service
+cd tufirewall
 vi tu.conf # 룰 정보 수정하면 됩니다. 
+cd ./service
 gcc load_tufirewall.c -o load 
 sudo ./load # IOCTL을 사용하는 것이기에 관리자 권한이 필요합니다. 
 ```
