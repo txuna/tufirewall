@@ -11,8 +11,6 @@ int push_rule(struct list_head *head, struct rule_data *data)
 
 	rule->data = data;
 	list_add_tail(&rule->list, head);
-	printk(KERN_INFO "Push Rule\n");
-
 	return 0;
 }
 
