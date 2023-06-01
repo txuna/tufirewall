@@ -418,41 +418,6 @@ static void setup_testrule(void)
 		rule->ip = ip_value;
 		push_rule(&tu_rules.list, rule);
 	}
-
-	rule = (struct rule_data *)kcalloc(1, sizeof(struct rule_data), GFP_KERNEL); 
-
-	if(rule != NULL)
-	{
-		if(tu_inet_pton_ipv4("1.1.1.1", &ip_value) == 0)
-		{
-			kfree(rule);
-			return;
-		}
-		strncpy(rule->name, "[google name server drop]", strlen("[google name server drop]"));
-		rule->action = NF_DROP; 
-		rule->protocol = IPPROTO_ICMP; 
-		rule->when = WHEN_OUT_ZONE;
-		rule->ip = ip_value;
-		push_rule(&tu_rules.list, rule);
-	}
-	
-	rule = (struct rule_data *)kcalloc(1, sizeof(struct rule_data), GFP_KERNEL); 
-
-	if(rule != NULL)
-	{
-		if(tu_inet_pton_ipv4("200.200.200.200", &ip_value) == 0)
-		{
-			kfree(rule);
-			return;
-		}
-		strncpy(rule->name, "[home rule]", strlen("[home rule]"));
-		rule->action = NF_DROP; 
-		rule->protocol = IPPROTO_TCP; 
-		rule->when = WHEN_IN_ZONE;
-		rule->ip = ip_value;
-		rule->port = 50000;
-		push_rule(&tu_rules.list, rule);
-	}
 }
 
 static int tu_inet_pton_ipv4(const char* ip_str, __u32* ip_addr) {
